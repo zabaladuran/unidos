@@ -14,7 +14,10 @@ const pool = mysql.createPool({
     queueLimit: 0,
     charset: 'utf8mb4',
     enableKeepAlive: true,
-    keepAliveInitialDelayMs: 0
+    keepAliveInitialDelayMs: 0,
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 pool.on('error', (err) => {
