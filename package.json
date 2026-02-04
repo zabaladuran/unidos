@@ -1,0 +1,25 @@
+{
+  "name": "unidos-paqueteria",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de paquetería para registro de entregas y pagos",
+  "main": "backend/index.php",
+  "scripts": {
+    "dev-backend": "cd backend && php -S localhost:5000",
+    "dev-frontend": "cd frontend && python -m http.server 3000",
+    "start": "npm run dev-backend",
+    "deploy": "git push origin main"
+  },
+  "keywords": [
+    "paqueteria",
+    "gestión",
+    "entregas",
+    "pagos",
+    "reportes"
+  ],
+  "author": "zabaladuran",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zabaladuran/unidos.git"
+  }
+}
