@@ -2,13 +2,14 @@ import { pool, initializeDatabase } from './config/database.js';
 import bcrypt from 'bcryptjs';
 
 async function seedDatabase() {
+    let connection;
     try {
-        console.log('🌱 Inicializando base de datos...');
+        console.log('🌱 Inicializando base de datos MySQL...');
         
         // Inicializar tablas
         await initializeDatabase();
 
-        const client = await pool.connect();
+        connection = await pool.getConnection();
 
         // Crear usuarios de prueba
         console.log('👥 Creando usuarios de prueba...');
@@ -44,8 +45,8 @@ async function seedDatabase() {
             const salt = await bcrypt.genSalt(10);
             const contraseñaEncriptada = await bcrypt.hash(usuario.contraseña, salt);
 
-            await client.query(
-                'INSERT INTO usuarios (nombre, email, contraseña, rol) VALUES ($1, $2, $3, $4)',
+            await connection.query(
+                'INSERT INTO usuarios (nombre, email, contraseña, rol) VALUES (?, ?, ?, ?)',
                 [usuario.nombre, usuario.email, contraseñaEncriptada, usuario.rol]
             );
 
@@ -80,8 +81,8 @@ async function seedDatabase() {
         ];
 
         for (const cliente of clientes) {
-            await client.query(
-                'INSERT INTO clientes (nombre, email, telefono, ciudad, trabajador_id) VALUES ($1, $2, $3, $4, $5)',
+            await connection.query(
+                'INSERT INTO clientes (nombre, email, telefono, ciudad, trabajador_id) VALUES (?, ?, ?, ?, ?)',
                 [cliente.nombre, cliente.email, cliente.telefono, cliente.ciudad, cliente.trabajador_id]
             );
 
@@ -127,10 +128,10 @@ async function seedDatabase() {
         ];
 
         for (const paquete of paquetes) {
-            await client.query(
+            await connection.query(
                 `INSERT INTO paquetes 
                 (cliente_id, trabajador_id, descripcion, precio, tipo_pago, estado, fecha_entrega, fecha_pago) 
-                VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())`,
                 [
                     paquete.cliente_id,
                     paquete.trabajador_id,
@@ -144,9 +145,9 @@ async function seedDatabase() {
             console.log(`✅ Paquete creado: ${paquete.descripcion}`);
         }
 
-        client.release();
+        connection.release();
 
-        console.log('\n✅ Base de datos inicializada correctamente con datos de prueba');
+        console.log('\n✅ Base de datos MySQL inicializada correctamente con datos de prueba');
         console.log('\n📋 Usuarios de prueba:');
         console.log('├─ Admin: admin@unidos.com / admin123');
         console.log('├─ Jefe: jefe@unidos.com / jefe123');
@@ -155,6 +156,7 @@ async function seedDatabase() {
 
         process.exit(0);
     } catch (err) {
+        if (connection) connection.release();
         console.error('❌ Error inicializando BD:', err);
         process.exit(1);
     }

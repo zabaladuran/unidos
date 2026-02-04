@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Crear paquete (trabajador)
 router.post('/', verificarRol('trabajador', 'admin'), async (req, res) => {
+    let connection;
     try {
         const { cliente_id, descripcion, precio, tipo_pago, observaciones } = req.body;
         const trabajador_id = req.usuario.id;
@@ -20,19 +21,31 @@ router.post('/', verificarRol('trabajador', 'admin'), async (req, res) => {
             return res.status(400).json({ error: 'Tipo de pago inválido' });
         }
 
-        const resultado = await pool.query(
+        connection = await pool.getConnection();
+
+        const [resultado] = await connection.query(
             `INSERT INTO paquetes 
             (cliente_id, trabajador_id, descripcion, precio, tipo_pago, observaciones) 
-            VALUES ($1, $2, $3, $4, $5, $6) 
-            RETURNING *`,
+            VALUES (?, ?, ?, ?, ?, ?)`,
             [cliente_id, trabajador_id, descripcion, precio, tipo_pago, observaciones || null]
         );
 
+        connection.release();
+
         res.status(201).json({
             mensaje: 'Paquete registrado exitosamente',
-            paquete: resultado.rows[0]
+            paquete: {
+                id: resultado.insertId,
+                cliente_id,
+                trabajador_id,
+                descripcion,
+                precio,
+                tipo_pago,
+                estado: 'pendiente'
+            }
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error al crear paquete:', err);
         res.status(500).json({ error: 'Error al registrar paquete' });
     }
@@ -40,32 +53,37 @@ router.post('/', verificarRol('trabajador', 'admin'), async (req, res) => {
 
 // Obtener paquetes del trabajador
 router.get('/mis-paquetes', verificarRol('trabajador', 'admin'), async (req, res) => {
+    let connection;
     try {
         const trabajador_id = req.usuario.id;
         const { estado } = req.query;
 
-        let query = `
+        connection = await pool.getConnection();
+
+        let sql = `
             SELECT p.*, c.nombre as cliente_nombre, c.telefono as cliente_telefono
             FROM paquetes p
             LEFT JOIN clientes c ON p.cliente_id = c.id
-            WHERE p.trabajador_id = $1
+            WHERE p.trabajador_id = ?
         `;
-        const params = [trabajador_id];
+        let params = [trabajador_id];
 
         if (estado) {
-            query += ` AND p.estado = $2`;
+            sql += ` AND p.estado = ?`;
             params.push(estado);
         }
 
-        query += ` ORDER BY p.fecha_registro DESC`;
+        sql += ` ORDER BY p.fecha_registro DESC`;
 
-        const resultado = await pool.query(query, params);
+        const [paquetes] = await connection.query(sql, params);
+        connection.release();
 
         res.json({
-            total: resultado.rows.length,
-            paquetes: resultado.rows
+            total: paquetes.length,
+            paquetes: paquetes
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error al obtener paquetes:', err);
         res.status(500).json({ error: 'Error al obtener paquetes' });
     }
@@ -73,10 +91,13 @@ router.get('/mis-paquetes', verificarRol('trabajador', 'admin'), async (req, res
 
 // Obtener todos los paquetes (admin/jefe)
 router.get('/', verificarRol('admin', 'jefe'), async (req, res) => {
+    let connection;
     try {
         const { trabajador_id, estado, fecha_inicio, fecha_fin } = req.query;
 
-        let query = `
+        connection = await pool.getConnection();
+
+        let sql = `
             SELECT p.*, 
                    c.nombre as cliente_nombre, 
                    u.nombre as trabajador_nombre
@@ -85,42 +106,39 @@ router.get('/', verificarRol('admin', 'jefe'), async (req, res) => {
             LEFT JOIN usuarios u ON p.trabajador_id = u.id
             WHERE 1=1
         `;
-        const params = [];
-        let paramCount = 1;
+        let params = [];
 
         if (trabajador_id) {
-            query += ` AND p.trabajador_id = $${paramCount}`;
+            sql += ` AND p.trabajador_id = ?`;
             params.push(trabajador_id);
-            paramCount++;
         }
 
         if (estado) {
-            query += ` AND p.estado = $${paramCount}`;
+            sql += ` AND p.estado = ?`;
             params.push(estado);
-            paramCount++;
         }
 
         if (fecha_inicio) {
-            query += ` AND p.fecha_registro >= $${paramCount}`;
+            sql += ` AND DATE(p.fecha_registro) >= ?`;
             params.push(fecha_inicio);
-            paramCount++;
         }
 
         if (fecha_fin) {
-            query += ` AND p.fecha_registro <= $${paramCount}`;
+            sql += ` AND DATE(p.fecha_registro) <= ?`;
             params.push(fecha_fin);
-            paramCount++;
         }
 
-        query += ` ORDER BY p.fecha_registro DESC`;
+        sql += ` ORDER BY p.fecha_registro DESC`;
 
-        const resultado = await pool.query(query, params);
+        const [paquetes] = await connection.query(sql, params);
+        connection.release();
 
         res.json({
-            total: resultado.rows.length,
-            paquetes: resultado.rows
+            total: paquetes.length,
+            paquetes: paquetes
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error al obtener paquetes:', err);
         res.status(500).json({ error: 'Error al obtener paquetes' });
     }
@@ -128,27 +146,38 @@ router.get('/', verificarRol('admin', 'jefe'), async (req, res) => {
 
 // Marcar paquete como entregado
 router.patch('/:id/entregar', verificarRol('trabajador', 'admin'), async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
         const trabajador_id = req.usuario.id;
 
-        const resultado = await pool.query(
+        connection = await pool.getConnection();
+
+        const [resultado] = await connection.query(
             `UPDATE paquetes 
-            SET estado = 'entregado', fecha_entrega = CURRENT_TIMESTAMP
-            WHERE id = $1 AND trabajador_id = $2
-            RETURNING *`,
+            SET estado = 'entregado', fecha_entrega = NOW()
+            WHERE id = ? AND trabajador_id = ?`,
             [id, trabajador_id]
         );
 
-        if (resultado.rows.length === 0) {
+        if (resultado.affectedRows === 0) {
+            connection.release();
             return res.status(404).json({ error: 'Paquete no encontrado' });
         }
 
+        const [paquete] = await connection.query(
+            'SELECT * FROM paquetes WHERE id = ?',
+            [id]
+        );
+
+        connection.release();
+
         res.json({
             mensaje: 'Paquete marcado como entregado',
-            paquete: resultado.rows[0]
+            paquete: paquete[0]
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error al entregar paquete:', err);
         res.status(500).json({ error: 'Error al entregar paquete' });
     }
@@ -156,37 +185,49 @@ router.patch('/:id/entregar', verificarRol('trabajador', 'admin'), async (req, r
 
 // Registrar pago
 router.post('/:id/pagar', async (req, res) => {
+    let connection;
     try {
         const { id } = req.params;
         const { monto } = req.body;
 
+        connection = await pool.getConnection();
+
         // Actualizar paquete
-        const resultado = await pool.query(
+        const [resultado] = await connection.query(
             `UPDATE paquetes 
-            SET estado = 'pagado', fecha_pago = CURRENT_TIMESTAMP
-            WHERE id = $1
-            RETURNING *`,
+            SET estado = 'pagado', fecha_pago = NOW()
+            WHERE id = ?`,
             [id]
         );
 
-        if (resultado.rows.length === 0) {
+        if (resultado.affectedRows === 0) {
+            connection.release();
             return res.status(404).json({ error: 'Paquete no encontrado' });
         }
 
-        const paquete = resultado.rows[0];
+        // Obtener paquete
+        const [paquetes] = await connection.query(
+            'SELECT * FROM paquetes WHERE id = ?',
+            [id]
+        );
+
+        const paquete = paquetes[0];
 
         // Registrar pago
-        await pool.query(
+        await connection.query(
             `INSERT INTO pagos (paquete_id, cliente_id, monto, tipo_pago)
-            VALUES ($1, $2, $3, $4)`,
+            VALUES (?, ?, ?, ?)`,
             [id, paquete.cliente_id, monto, paquete.tipo_pago]
         );
+
+        connection.release();
 
         res.json({
             mensaje: 'Pago registrado exitosamente',
             paquete
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error al registrar pago:', err);
         res.status(500).json({ error: 'Error al registrar pago' });
     }

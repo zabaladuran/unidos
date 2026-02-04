@@ -7,6 +7,7 @@ const router = express.Router();
 
 // Registro
 router.post('/registro', async (req, res) => {
+    let connection;
     try {
         const { nombre, email, contraseña, rol } = req.body;
 
@@ -19,13 +20,16 @@ router.post('/registro', async (req, res) => {
             return res.status(400).json({ error: 'Rol inválido' });
         }
 
+        connection = await pool.getConnection();
+
         // Verificar si el usuario existe
-        const existente = await pool.query(
-            'SELECT * FROM usuarios WHERE email = $1',
+        const [existente] = await connection.query(
+            'SELECT * FROM usuarios WHERE email = ?',
             [email]
         );
 
-        if (existente.rows.length > 0) {
+        if (existente.length > 0) {
+            connection.release();
             return res.status(409).json({ error: 'El email ya está registrado' });
         }
 
@@ -34,26 +38,34 @@ router.post('/registro', async (req, res) => {
         const contraseñaEncriptada = await bcrypt.hash(contraseña, salt);
 
         // Crear usuario
-        const resultado = await pool.query(
-            'INSERT INTO usuarios (nombre, email, contraseña, rol) VALUES ($1, $2, $3, $4) RETURNING id, nombre, email, rol',
+        const [resultado] = await connection.query(
+            'INSERT INTO usuarios (nombre, email, contraseña, rol) VALUES (?, ?, ?, ?)',
             [nombre, email, contraseñaEncriptada, rol]
         );
 
-        const usuario = resultado.rows[0];
+        const usuarioId = resultado.insertId;
 
         // Generar token
         const token = jwt.sign(
-            { id: usuario.id, email: usuario.email, rol: usuario.rol },
+            { id: usuarioId, email: email, rol: rol },
             process.env.JWT_SECRET,
             { expiresIn: '30d' }
         );
 
+        connection.release();
+
         res.status(201).json({
             mensaje: 'Usuario registrado exitosamente',
-            usuario,
+            usuario: {
+                id: usuarioId,
+                nombre: nombre,
+                email: email,
+                rol: rol
+            },
             token
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error en registro:', err);
         res.status(500).json({ error: 'Error al registrar usuario' });
     }
@@ -61,6 +73,7 @@ router.post('/registro', async (req, res) => {
 
 // Login
 router.post('/login', async (req, res) => {
+    let connection;
     try {
         const { email, contraseña } = req.body;
 
@@ -68,27 +81,32 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Email y contraseña requeridos' });
         }
 
+        connection = await pool.getConnection();
+
         // Buscar usuario
-        const resultado = await pool.query(
-            'SELECT * FROM usuarios WHERE email = $1',
+        const [rows] = await connection.query(
+            'SELECT * FROM usuarios WHERE email = ?',
             [email]
         );
 
-        if (resultado.rows.length === 0) {
+        if (rows.length === 0) {
+            connection.release();
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
-        const usuario = resultado.rows[0];
+        const usuario = rows[0];
 
         // Verificar contraseña
         const contraseñaValida = await bcrypt.compare(contraseña, usuario.contraseña);
 
         if (!contraseñaValida) {
+            connection.release();
             return res.status(401).json({ error: 'Credenciales inválidas' });
         }
 
         // Verificar estado
         if (!usuario.estado) {
+            connection.release();
             return res.status(403).json({ error: 'Usuario inactivo' });
         }
 
@@ -98,6 +116,8 @@ router.post('/login', async (req, res) => {
             process.env.JWT_SECRET,
             { expiresIn: '30d' }
         );
+
+        connection.release();
 
         res.json({
             mensaje: 'Sesión iniciada exitosamente',
@@ -110,6 +130,7 @@ router.post('/login', async (req, res) => {
             token
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error en login:', err);
         res.status(500).json({ error: 'Error al iniciar sesión' });
     }

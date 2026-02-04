@@ -1,12 +1,20 @@
-import pkg from 'pg';
-const { Pool } = pkg;
+import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+const pool = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || 'unidos_db',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    charset: 'utf8mb4',
+    enableKeepAlive: true,
+    keepAliveInitialDelayMs: 0
 });
 
 pool.on('error', (err) => {
@@ -15,100 +23,115 @@ pool.on('error', (err) => {
 
 // Crear tablas si no existen
 export async function initializeDatabase() {
+    let connection;
     try {
-        const client = await pool.connect();
+        connection = await pool.getConnection();
         
         // Tabla usuarios
-        await client.query(`
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
+                id INT AUTO_INCREMENT PRIMARY KEY,
                 nombre VARCHAR(100) NOT NULL,
                 email VARCHAR(100) UNIQUE NOT NULL,
                 contraseña VARCHAR(255) NOT NULL,
-                rol VARCHAR(20) NOT NULL CHECK (rol IN ('admin', 'jefe', 'trabajador')),
+                rol ENUM('admin', 'jefe', 'trabajador') NOT NULL DEFAULT 'trabajador',
                 estado BOOLEAN DEFAULT true,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_email (email),
+                INDEX idx_rol (rol)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // Tabla clientes
-        await client.query(`
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS clientes (
-                id SERIAL PRIMARY KEY,
+                id INT AUTO_INCREMENT PRIMARY KEY,
                 nombre VARCHAR(100) NOT NULL,
                 email VARCHAR(100),
                 telefono VARCHAR(20),
                 direccion TEXT,
                 ciudad VARCHAR(50),
-                trabajador_id INT REFERENCES usuarios(id),
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                trabajador_id INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+                INDEX idx_trabajador (trabajador_id),
+                INDEX idx_nombre (nombre)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // Tabla paquetes
-        await client.query(`
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS paquetes (
-                id SERIAL PRIMARY KEY,
-                cliente_id INT REFERENCES clientes(id),
-                trabajador_id INT REFERENCES usuarios(id),
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cliente_id INT,
+                trabajador_id INT NOT NULL,
                 descripcion TEXT NOT NULL,
                 precio DECIMAL(10, 2) NOT NULL,
-                tipo_pago VARCHAR(20) NOT NULL CHECK (tipo_pago IN ('contado', 'contraentrega', 'credito', 'nequi')),
-                estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'entregado', 'pagado', 'cancelado')),
+                tipo_pago ENUM('contado', 'contraentrega', 'credito', 'nequi') NOT NULL,
+                estado ENUM('pendiente', 'entregado', 'pagado', 'cancelado') NOT NULL DEFAULT 'pendiente',
                 fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                fecha_entrega TIMESTAMP,
-                fecha_pago TIMESTAMP,
+                fecha_entrega TIMESTAMP NULL,
+                fecha_pago TIMESTAMP NULL,
                 observaciones TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                INDEX idx_trabajador (trabajador_id),
+                INDEX idx_cliente (cliente_id),
+                INDEX idx_estado (estado),
+                INDEX idx_tipo_pago (tipo_pago),
+                INDEX idx_fecha (fecha_registro)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // Tabla pagos
-        await client.query(`
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS pagos (
-                id SERIAL PRIMARY KEY,
-                paquete_id INT REFERENCES paquetes(id),
-                cliente_id INT REFERENCES clientes(id),
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                paquete_id INT NOT NULL,
+                cliente_id INT,
                 monto DECIMAL(10, 2) NOT NULL,
-                tipo_pago VARCHAR(20) NOT NULL,
+                tipo_pago ENUM('contado', 'contraentrega', 'credito', 'nequi') NOT NULL,
                 fecha_pago TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 comprobante VARCHAR(255),
                 estado VARCHAR(20) DEFAULT 'confirmado',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (paquete_id) REFERENCES paquetes(id) ON DELETE CASCADE,
+                FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE SET NULL,
+                INDEX idx_paquete (paquete_id),
+                INDEX idx_cliente (cliente_id),
+                INDEX idx_fecha (fecha_pago)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
         // Tabla recaudos
-        await client.query(`
+        await connection.query(`
             CREATE TABLE IF NOT EXISTS recaudos (
-                id SERIAL PRIMARY KEY,
-                trabajador_id INT REFERENCES usuarios(id),
-                jefe_id INT REFERENCES usuarios(id),
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                trabajador_id INT NOT NULL,
+                jefe_id INT,
                 total_recaudado DECIMAL(10, 2) NOT NULL,
                 cantidad_paquetes INT NOT NULL,
                 fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 estado VARCHAR(20) DEFAULT 'pendiente',
                 observaciones TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (trabajador_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+                FOREIGN KEY (jefe_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+                INDEX idx_trabajador (trabajador_id),
+                INDEX idx_jefe (jefe_id),
+                INDEX idx_fecha (fecha)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
         `);
 
-        // Índices
-        await client.query(`
-            CREATE INDEX IF NOT EXISTS idx_paquetes_trabajador ON paquetes(trabajador_id);
-            CREATE INDEX IF NOT EXISTS idx_paquetes_cliente ON paquetes(cliente_id);
-            CREATE INDEX IF NOT EXISTS idx_paquetes_estado ON paquetes(estado);
-            CREATE INDEX IF NOT EXISTS idx_pagos_cliente ON pagos(cliente_id);
-            CREATE INDEX IF NOT EXISTS idx_recaudos_trabajador ON recaudos(trabajador_id);
-        `);
-
-        console.log('✅ Base de datos inicializada correctamente');
-        client.release();
+        console.log('✅ Base de datos MySQL inicializada correctamente');
+        connection.release();
     } catch (err) {
         console.error('❌ Error inicializando base de datos:', err);
-        process.exit(1);
+        if (connection) connection.release();
+        throw err;
     }
 }
 

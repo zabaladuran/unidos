@@ -6,9 +6,12 @@ const router = express.Router();
 
 // Reporte de recaudos por trabajador (para jefe)
 router.get('/recaudos-trabajador/:trabajador_id', verificarRol('jefe', 'admin'), async (req, res) => {
+    let connection;
     try {
         const { trabajador_id } = req.params;
         const { fecha_inicio, fecha_fin } = req.query;
+
+        connection = await pool.getConnection();
 
         let query = `
             SELECT 
@@ -21,25 +24,22 @@ router.get('/recaudos-trabajador/:trabajador_id', verificarRol('jefe', 'admin'),
                 COUNT(CASE WHEN p.tipo_pago = 'nequi' THEN 1 END) as pagos_nequi,
                 COUNT(CASE WHEN p.tipo_pago = 'credito' THEN 1 END) as pagos_credito
             FROM paquetes p
-            WHERE p.trabajador_id = $1
+            WHERE p.trabajador_id = ?
         `;
-        const params = [trabajador_id];
-        let paramCount = 2;
+        let params = [trabajador_id];
 
         if (fecha_inicio) {
-            query += ` AND p.fecha_registro >= $${paramCount}`;
+            query += ` AND DATE(p.fecha_registro) >= ?`;
             params.push(fecha_inicio);
-            paramCount++;
         }
 
         if (fecha_fin) {
-            query += ` AND p.fecha_registro <= $${paramCount}`;
+            query += ` AND DATE(p.fecha_registro) <= ?`;
             params.push(fecha_fin);
-            paramCount++;
         }
 
-        const resultado = await pool.query(query, params);
-        const resumen = resultado.rows[0];
+        const [resumenRows] = await connection.query(query, params);
+        const resumen = resumenRows[0];
 
         // Obtener detalle por cliente
         const detalleQuery = `
@@ -52,18 +52,20 @@ router.get('/recaudos-trabajador/:trabajador_id', verificarRol('jefe', 'admin'),
                 SUM(CASE WHEN p.estado = 'pendiente' THEN p.precio ELSE 0 END) as monto_pendiente
             FROM paquetes p
             LEFT JOIN clientes c ON p.cliente_id = c.id
-            WHERE p.trabajador_id = $1
+            WHERE p.trabajador_id = ?
             GROUP BY c.id, c.nombre
             ORDER BY monto_total DESC
         `;
 
-        const detalleResultado = await pool.query(detalleQuery, [trabajador_id]);
+        const [detalleRows] = await connection.query(detalleQuery, [trabajador_id]);
+        connection.release();
 
         res.json({
             resumen,
-            detalleClientes: detalleResultado.rows
+            detalleClientes: detalleRows
         });
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error al obtener reporte:', err);
         res.status(500).json({ error: 'Error al obtener reporte' });
     }
@@ -71,8 +73,11 @@ router.get('/recaudos-trabajador/:trabajador_id', verificarRol('jefe', 'admin'),
 
 // Reporte de pagos por tipo
 router.get('/pagos-por-tipo', verificarRol('jefe', 'admin'), async (req, res) => {
+    let connection;
     try {
         const { fecha_inicio, fecha_fin } = req.query;
+
+        connection = await pool.getConnection();
 
         let query = `
             SELECT 
@@ -83,27 +88,26 @@ router.get('/pagos-por-tipo', verificarRol('jefe', 'admin'), async (req, res) =>
             FROM pagos
             WHERE 1=1
         `;
-        const params = [];
-        let paramCount = 1;
+        let params = [];
 
         if (fecha_inicio) {
-            query += ` AND fecha_pago >= $${paramCount}`;
+            query += ` AND DATE(fecha_pago) >= ?`;
             params.push(fecha_inicio);
-            paramCount++;
         }
 
         if (fecha_fin) {
-            query += ` AND fecha_pago <= $${paramCount}`;
+            query += ` AND DATE(fecha_pago) <= ?`;
             params.push(fecha_fin);
-            paramCount++;
         }
 
         query += ` GROUP BY tipo_pago ORDER BY total DESC`;
 
-        const resultado = await pool.query(query, params);
+        const [rows] = await connection.query(query, params);
+        connection.release();
 
-        res.json(resultado.rows);
+        res.json(rows);
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error en reporte de pagos:', err);
         res.status(500).json({ error: 'Error al obtener reporte' });
     }
@@ -111,8 +115,11 @@ router.get('/pagos-por-tipo', verificarRol('jefe', 'admin'), async (req, res) =>
 
 // Reporte de recaudos totales
 router.get('/recaudos-totales', verificarRol('jefe', 'admin'), async (req, res) => {
+    let connection;
     try {
         const { fecha_inicio, fecha_fin } = req.query;
+
+        connection = await pool.getConnection();
 
         let query = `
             SELECT 
@@ -126,27 +133,26 @@ router.get('/recaudos-totales', verificarRol('jefe', 'admin'), async (req, res) 
             LEFT JOIN paquetes p ON u.id = p.trabajador_id
             WHERE u.rol = 'trabajador'
         `;
-        const params = [];
-        let paramCount = 1;
+        let params = [];
 
         if (fecha_inicio) {
-            query += ` AND p.fecha_registro >= $${paramCount}`;
+            query += ` AND DATE(p.fecha_registro) >= ?`;
             params.push(fecha_inicio);
-            paramCount++;
         }
 
         if (fecha_fin) {
-            query += ` AND p.fecha_registro <= $${paramCount}`;
+            query += ` AND DATE(p.fecha_registro) <= ?`;
             params.push(fecha_fin);
-            paramCount++;
         }
 
         query += ` GROUP BY u.id, u.nombre ORDER BY total_recaudado DESC`;
 
-        const resultado = await pool.query(query, params);
+        const [rows] = await connection.query(query, params);
+        connection.release();
 
-        res.json(resultado.rows);
+        res.json(rows);
     } catch (err) {
+        if (connection) connection.release();
         console.error('Error en reporte de recaudos:', err);
         res.status(500).json({ error: 'Error al obtener reporte' });
     }

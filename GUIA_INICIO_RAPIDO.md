@@ -2,25 +2,35 @@
 
 ## Inicio Rápido (5 minutos)
 
-### 1. Preparar Base de Datos Aiven
+### 1. Base de Datos MySQL Aiven (YA CONFIGURADA)
+
+Tu MySQL ya está creado en Aiven con estos datos:
 
 ```
-1. Ir a https://aiven.io
-2. Registrarse (prueba gratis 300 creditos)
-3. Crear "PostgreSQL" service
-4. Copiar "Service URI"
-5. Pegar en archivo .env como DATABASE_URL
+Host: mysql-9adc554-calculadora-imc.g.aivencloud.com
+Puerto: 12731
+Usuario: avnadmin
+Contraseña: AVfS_3ZYFyJhrvSGTHdZ-1U
+Base de datos: defaultdb
 ```
 
-### 2. Configurar Proyecto
+**Pasos:**
+1. Ve a archivo `script-crear-tablas-usuarios.sql` en la raíz del proyecto
+2. Copia TODO el contenido
+3. Ve a Aiven → tu servicio MySQL → phpmyadmin
+4. Pega en la pestaña "SQL"
+5. Ejecuta
+
+Más detalles en: `INSTRUCCIONES_CREAR_BD.md`
+
+### 2. Configurar Proyecto Localmente
 
 ```bash
 # Copiar archivo de configuración
 cp .env.example .env
 
-# Editar .env con tus datos
-# DATABASE_URL=postgresql://...
-# JWT_SECRET=mi_clave_segura
+# Los datos de BD ya están en .env.example
+# Solo cambiar JWT_SECRET si quieres
 ```
 
 ### 3. Instalar Dependencias
@@ -29,45 +39,48 @@ cp .env.example .env
 npm install
 ```
 
-### 4. Probar Localmente
+### 4. Iniciar Servidor
 
-**Terminal 1 - Backend**
 ```bash
 npm run dev
-# Estará en http://localhost:5000
 ```
 
-**Terminal 2 - Frontend (opcional)**
+Estará en: `http://localhost:5000`
+
+Verás:
+```
+🚀 Servidor ejecutándose en puerto 5000
+📦 UNIDOS - Sistema de Gestión de Paquetería
+🔗 API: http://localhost:5000/api
+📊 Health: http://localhost:5000/api/health
+```
+
+### 5. Acceder a la App
+
+Opción A - Abrir en navegador:
+```
+file:///C:/Users/elsek/Desktop/unidos/SRC/index.html
+```
+
+Opción B - Servir con Python (recomendado):
 ```bash
 cd SRC
 python -m http.server 3000
-# Abre http://localhost:3000
+# Luego abre http://localhost:3000
 ```
 
-### 5. Crear Cuentas de Prueba
+### 6. Login
 
-**Opción A: Vía API**
-```bash
-curl -X POST http://localhost:5000/api/auth/registro \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nombre": "Juan Trabajador",
-    "email": "juan@example.com",
-    "contraseña": "123456",
-    "rol": "trabajador"
-  }'
-```
+Usa estas credenciales:
 
-**Opción B: Vía Frontend**
-1. Abre `SRC/index.html`
-2. Clic en "Crear Cuenta"
-3. Completa formulario
+| Usuario | Email | Contraseña |
+|---------|-------|-----------|
+| Admin | admin@unidos.com | admin123 |
+| Jefe | jefe@unidos.com | jefe123 |
+| Trabajador 1 | juan@unidos.com | juan123 |
+| Trabajador 2 | pedro@unidos.com | pedro123 |
 
-### 6. Login y Uso
-
-1. Abre `SRC/frontend/login.html`
-2. Usa las credenciales creadas
-3. ¡Listo! Estás en tu dashboard
+---
 
 ## 🌐 Desplegar en Vercel (2 pasos)
 
@@ -75,7 +88,7 @@ curl -X POST http://localhost:5000/api/auth/registro \
 
 ```bash
 git add .
-git commit -m "Sistema UNIDOS completo"
+git commit -m "Sistema UNIDOS con MySQL Aiven"
 git push origin main
 ```
 
@@ -85,50 +98,58 @@ git push origin main
 2. Click "New Project"
 3. Seleccionar repo de GitHub
 4. Agregar Environment Variables:
-   - `DATABASE_URL`: Tu URL de Aiven
-   - `JWT_SECRET`: Tu clave secreta
-   - `CORS_ORIGIN`: La URL de tu app
+   ```
+   DB_HOST=mysql-9adc554-calculadora-imc.g.aivencloud.com
+   DB_PORT=12731
+   DB_USER=avnadmin
+   DB_PASSWORD=AVfS_3ZYFyJhrvSGTHdZ-1U
+   DB_NAME=defaultdb
+   JWT_SECRET=tu_clave_super_secreta
+   NODE_ENV=production
+   ```
 5. Deploy ✅
+
+---
 
 ## 📱 Accesos por Rol
 
 | Rol | Email | Contraseña | Funciones |
 |-----|-------|-----------|-----------|
-| Trabajador | juan@example.com | 123456 | Registrar paquetes, ver pagos |
-| Jefe | jefe@example.com | 123456 | Ver recaudos, reportes |
-| Admin | admin@example.com | 123456 | Gestionar usuarios, todo |
+| **Admin** | admin@unidos.com | admin123 | Todo el sistema |
+| **Jefe** | jefe@unidos.com | jefe123 | Ver recaudos, reportes |
+| **Trabajador** | juan@unidos.com | juan123 | Registrar paquetes |
+| **Trabajador** | pedro@unidos.com | pedro123 | Registrar paquetes |
+
+---
 
 ## 📊 Flujo de Trabajo
 
 ```
 Trabajador registra paquete
-         ↓
+    ↓
 Marca como entregado
-         ↓
+    ↓
 Registra pago (tipo: contado/contraentrega/nequi/crédito)
-         ↓
+    ↓
 Jefe ve reporte de recaudos
-         ↓
+    ↓
 Verifica lo que le debe cada trabajador
-         ↓
+    ↓
 Admin revisa todo el sistema
 ```
 
-## 🎯 Tipos de Pago
+---
 
-- **Contado** ($): Cliente paga al recibir
-- **Contraentrega**: Cobro al entregar
-- **Nequi**: Transferencia por PXP
-- **Crédito**: Pago después
+## 🔗 Archivos Importantes
 
-## 🔗 URLs Importantes
+- `script-crear-tablas-usuarios.sql` - Crear BD y usuarios
+- `INSTRUCCIONES_CREAR_BD.md` - Pasos detallados
+- `CONEXION_MYSQL_AIVEN.md` - Datos de conexión
+- `SRC/index.html` - Página principal
+- `SRC/frontend/login.html` - Login
+- `SRC/backend/index.js` - Servidor API
 
-- **Página Principal**: `SRC/index.html`
-- **Login**: `SRC/frontend/login.html`
-- **Registro**: `SRC/frontend/registro.html`
-- **Dashboard Trabajador**: `SRC/frontend/dashboard-trabajador.html`
-- **Dashboard Jefe**: `SRC/frontend/dashboard-jefe.html`
-- **Dashboard Admin**: `SRC/frontend/dashboard-admin.html`
+---
 
 ## ⚡ Comandos Útiles
 
@@ -144,24 +165,30 @@ npm i -g vercel
 vercel
 ```
 
+---
+
 ## ❓ Problemas Frecuentes
 
-**Error: "Cannot find module"**
+**Error: "Cannot find module mysql2"**
 ```bash
-npm install
+npm install mysql2
 ```
 
 **Error: "Database connection failed"**
-- Verifica DATABASE_URL en .env
-- Comprueba que la IP esté permitida en Aiven
+- Verifica que .env tenga los datos correctos
+- Verifica que los datos de Aiven sean exactos
 
 **Error: "CORS error"**
-- Agrega tu URL a CORS_ORIGIN en .env
-
-## 📞 Soporte
-
-Revisa `README_COMPLETO.md` para documentación completa.
+- Agregar tu URL a CORS_ORIGIN en .env
 
 ---
 
-¡Listo! Ahora tienes un sistema profesional de gestión de paquetería. 🎉
+## 📞 Soporte
+
+- Documentación completa: `README_COMPLETO.md`
+- Deploy Vercel: `DEPLOY_VERCEL.md`
+- API endpoints: `API_ENDPOINTS.md`
+
+---
+
+¡Listo! Ya tienes un sistema profesional de gestión de paquetería. 🎉
