@@ -194,16 +194,51 @@
     </style>
     
     <script>
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
+        const API_URL = 'http://localhost:5000/api';
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const button = this.querySelector('button');
             
-            // Aquí iría la lógica de autenticación
-            console.log('Iniciar sesión con:', email, password);
-            
-            // Ejemplo: redirigir al dashboard
-            alert('Función de login aún no implementada');
+            button.disabled = true;
+            button.textContent = 'Iniciando sesión...';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error al iniciar sesión');
+                }
+
+                // Guardar token
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('usuario', JSON.stringify(data.usuario));
+
+                // Redirigir según rol
+                const rol = data.usuario.rol;
+                if (rol === 'trabajador') {
+                    window.location.href = './dashboard-trabajador.html';
+                } else if (rol === 'jefe') {
+                    window.location.href = './dashboard-jefe.html';
+                } else if (rol === 'admin') {
+                    window.location.href = './dashboard-admin.html';
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+                button.disabled = false;
+                button.textContent = 'Iniciar Sesión';
+            }
         });
     </script>
 </body>

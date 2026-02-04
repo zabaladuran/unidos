@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "SRC/backend/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "SRC/frontend/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "SRC/backend/index.js"
+    },
+    {
+      "src": "/(.*\\..*)",
+      "dest": "SRC/frontend/$1"
+    },
+    {
+      "src": "/.*",
+      "dest": "SRC/frontend/index.html"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "5000"
+  }
+}

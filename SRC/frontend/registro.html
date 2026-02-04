@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crear Cuenta - UNIDOS</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">📦</div>
+            <h1>UNIDOS</h1>
+            <p class="subtitle">Crear una nueva cuenta</p>
+            
+            <form id="registroForm" class="form">
+                <div class="form-group">
+                    <label for="nombre">Nombre Completo</label>
+                    <input type="text" id="nombre" name="nombre" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Correo Electrónico</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Contraseña</label>
+                    <input type="password" id="password" name="password" required minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmar">Confirmar Contraseña</label>
+                    <input type="password" id="confirmar" name="confirmar" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="rol">Tipo de Cuenta</label>
+                    <select id="rol" name="rol" required>
+                        <option value="">-- Selecciona tu rol --</option>
+                        <option value="trabajador">Trabajador</option>
+                        <option value="jefe">Jefe</option>
+                        <option value="admin">Administrador</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">Crear Cuenta</button>
+            </form>
+            
+            <div class="form-links">
+                <p>¿Ya tienes cuenta? <a href="login.html">Inicia sesión aquí</a></p>
+            </div>
+            
+            <div class="back-link">
+                <a href="../index.html">← Volver al inicio</a>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+    </style>
+    
+    <script>
+        const API_URL = 'http://localhost:5000/api';
+
+        document.getElementById('registroForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const nombre = document.getElementById('nombre').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmar = document.getElementById('confirmar').value;
+            const rol = document.getElementById('rol').value;
+            const button = this.querySelector('button');
+
+            if (password !== confirmar) {
+                alert('Las contraseñas no coinciden');
+                return;
+            }
+
+            if (password.length < 6) {
+                alert('La contraseña debe tener al menos 6 caracteres');
+                return;
+            }
+
+            button.disabled = true;
+            button.textContent = 'Creando cuenta...';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/registro`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ nombre, email, contraseña: password, rol })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error al crear la cuenta');
+                }
+
+                // Guardar token
+                localStorage.setItem('token', data.token);
+                localStorage.setItem('usuario', JSON.stringify(data.usuario));
+
+                alert('Cuenta creada exitosamente');
+
+                // Redirigir según rol
+                const rolUsuario = data.usuario.rol;
+                if (rolUsuario === 'trabajador') {
+                    window.location.href = './dashboard-trabajador.html';
+                } else if (rolUsuario === 'jefe') {
+                    window.location.href = './dashboard-jefe.html';
+                } else if (rolUsuario === 'admin') {
+                    window.location.href = './dashboard-admin.html';
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+                button.disabled = false;
+                button.textContent = 'Crear Cuenta';
+            }
+        });
+    </script>
+</body>
+</html>
