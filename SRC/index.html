@@ -3,7 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UNIDOS - Bienvenido</title>
+    <title>UNIDOS - Sistema de Paquetería</title>
+    <link rel="stylesheet" href="frontend/css/style.css">
+</head>
+<body>
+    <div class="welcome-container">
+        <div class="logo">📦</div>
+        <h1>UNIDOS</h1>
+        <p class="subtitle">Sistema de Gestión de Paquetería</p>
+        
+        <div class="features">
+            <h3>¿Qué puedes hacer?</h3>
+            <ul>
+                <li>Registrar paquetes entregados</li>
+                <li>Controlar pagos (Contado, Contraentrega, Crédito, Nequi)</li>
+                <li>Generar reportes por cliente y fechas</li>
+                <li>Seguimiento de recaudos</li>
+                <li>Acceso desde cualquier dispositivo</li>
+            </ul>
+        </div>
+        
+        <div class="btn-container">
+            <a href="frontend/login.html" class="btn btn-primary">Iniciar Sesión</a>
+            <a href="frontend/registro.html" class="btn btn-secondary">Crear Cuenta</a>
+        </div>
+        
+        <div class="info">
+            <p><strong>UNIDOS</strong> es tu herramienta de gestión de paquetería en la nube.</p>
+            <p style="margin-top: 10px;">Rápido, seguro y confiable.</p>
+        </div>
+    </div>
+    
     <style>
         * {
             margin: 0;
@@ -125,41 +155,13 @@
             color: #6b7280;
         }
     </style>
-</head>
-<body>
-    <div class="welcome-container">
-        <div class="logo">📦</div>
-        <h1>UNIDOS</h1>
-        <p class="subtitle">Sistema de Gestión de Paquetería</p>
-        
-        <div class="features">
-            <h3>¿Qué puedes hacer?</h3>
-            <ul>
-                <li>Registrar paquetes entregados</li>
-                <li>Controlar pagos (Contado, Contraentrega, Crédito, Nequi)</li>
-                <li>Generar reportes por cliente y fechas</li>
-                <li>Seguimiento de recaudos</li>
-                <li>Acceso desde cualquier dispositivo</li>
-            </ul>
-        </div>
-        
-        <div class="btn-container">
-            <a href="login.html" class="btn btn-primary">Iniciar Sesión</a>
-            <a href="registro.html" class="btn btn-secondary">Crear Cuenta</a>
-        </div>
-        
-        <div class="info">
-            <p><strong>UNIDOS</strong> es tu herramienta de gestión de paquetería en la nube.</p>
-            <p style="margin-top: 10px;">Rápido, seguro y confiable.</p>
-        </div>
-    </div>
     
     <script>
         // Redirigir a login si ya hay sesión activa
         window.addEventListener('load', () => {
             const token = localStorage.getItem('token');
             if (token) {
-                window.location.href = 'dashboard.html';
+                window.location.href = 'frontend/dashboard.html';
             }
         });
     </script>

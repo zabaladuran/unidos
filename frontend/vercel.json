@@ -1,5 +1,0 @@
-{
-  "buildCommand": "echo 'Frontend listo'",
-  "outputDirectory": ".",
-  "installCommand": "echo 'No dependencies needed'"
-}
